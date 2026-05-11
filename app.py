@@ -146,28 +146,42 @@ with tab_analysis:
             
             st.dataframe(filtered_df.sort_values("Timestamp", ascending=False), use_container_width=True)
             
-            if st.button("🤖 AIで分析する", type="primary"):
+if st.button("🤖 AIで分析する", type="primary"):
                 if not API_KEY:
                     st.error("APIキーが設定されていません")
                 else:
                     with st.spinner("⏳ AIが分析中..."):
-                        # 🌟 データをテキスト化する際、Noneなどを安全に処理
+                        # 🌟 送信データを徹底的にお掃除する
                         combined_text = ""
                         for _, row in filtered_df.iterrows():
-                            combined_text += f"【{row['Event']}】担当:{row['Person']} / 内容:{row['Content']} / 反省:{row['Reflection']}\n"
+                            # 各項目から改行や変な文字を除去して1行にまとめる
+                            e = str(row['Event']).replace('\n', ' ')
+                            p = str(row['Person']).replace('\n', ' ')
+                            c = str(row['Content']).replace('\n', ' ')
+                            r = str(row['Reflection']).replace('\n', ' ')
+                            combined_text += f"イベント:{e} / 人:{p} / 内容:{c} / 反省:{r}\n"
                         
+                        # 文字列をきれいに掃除（念のため）
+                        combined_text = "".join(ch for ch in combined_text if ch.isprintable() or ch == '\n')
+
                         try:
-                            # 🌟 より安定した古いライブラリでの呼び出し方に変更
                             import google.generativeai as genai
                             genai.configure(api_key=API_KEY)
-                            model = genai.GenerativeModel('gemini-1.5-flash')
                             
-                            prompt = f"以下のイベント反省データを分析し、共通の課題と対策を日本語でまとめてください。\n\n{combined_text}"
+                            # 🌟 モデルを一番軽量な「flash-8b」に変えてみる（さらに高速化）
+                            model = genai.GenerativeModel('gemini-1.5-flash-8b')
+                            
+                            prompt = f"以下のイベント反省データを分析し、共通の課題と対策を日本語で短くまとめてください。\n\n{combined_text}"
+                            
+                            # タイムアウト対策：一気に取得する
                             response = model.generate_content(prompt)
                             
-                            st.markdown("### 📊 AI分析レポート")
-                            st.write(response.text)
+                            if response.text:
+                                st.markdown("### 📊 AI分析レポート")
+                                st.write(response.text)
+                            else:
+                                st.warning("AIから有効な返答が得られませんでした。")
+
                         except Exception as e:
-                            st.error(f"分析エラー: {str(e)}")
-    except Exception as e:
-        st.error(f"読み込みエラー: {str(e)}")
+                            # エラー内容をより詳しく出すように変更
+                            st.error(f"分析エラーが発生しました。詳細: {str(e)}")
