@@ -5,7 +5,7 @@ import datetime
 import json
 
 # ==========================================
-# 🌟 
+# 🌟API_KEY = st.secrets["GEMINI_API_KEY"] 
 # ==========================================
 DATA_FILE = "reflections.csv"
 MASTER_FILE = "master_data.json"
