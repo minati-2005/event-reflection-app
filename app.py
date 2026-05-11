@@ -3,9 +3,11 @@ import pandas as pd
 import os
 import datetime
 import json
+import urllib.request
+import urllib.error
 
 # ==========================================
-# 🌟 環境設定（日本語エラー対策）
+# 🌟 環境設定
 # ==========================================
 os.environ["LC_ALL"] = "C.UTF-8"
 os.environ["LANG"] = "C.UTF-8"
@@ -14,9 +16,9 @@ os.environ["PYTHONIOENCODING"] = "utf-8"
 DATA_FILE = "reflections.csv"
 MASTER_FILE = "master_data.json"
 
-# APIキーを金庫から取り出す
+# 🌟 APIキーの「見えない空白・改行」を自動で消す
 try:
-    API_KEY = st.secrets["GEMINI_API_KEY"]
+    API_KEY = st.secrets["GEMINI_API_KEY"].strip()
 except:
     API_KEY = ""
 
@@ -46,7 +48,6 @@ if not os.path.exists(DATA_FILE):
 
 master_data = load_master_data()
 
-# リセット用
 if "reset_key" not in st.session_state:
     st.session_state.reset_key = 0
 def reset_inputs():
@@ -57,7 +58,6 @@ def reset_inputs():
 # ==========================================
 st.set_page_config(page_title="イベント反省アプリ", layout="wide")
 
-# サイドバー：削除機能
 with st.sidebar:
     st.header("⚙️ 選択肢の削除")
     del_event = st.multiselect("🗑️ 削除するイベント", master_data["events"])
@@ -109,7 +109,6 @@ with tab_input:
             })
             new_row.to_csv(DATA_FILE, mode='a', header=False, index=False, encoding='utf-8-sig')
             
-            # マスターデータ更新
             updated = False
             if final_event and final_event not in master_data["events"]:
                 master_data["events"].append(final_event); updated = True
@@ -149,30 +148,36 @@ with tab_analysis:
                     if not API_KEY:
                         st.error("APIキーが設定されていません")
                     else:
-                        with st.spinner("⏳ AIが分析中..."):
-                            # 送信データのクリーニング
+                        with st.spinner("⏳ AIが直接分析中..."):
                             combined_text = ""
                             for _, row in filtered_df.iterrows():
                                 r = str(row['Reflection']).replace('\n', ' ')
                                 combined_text += f"【{row['Event']}】担当:{row['Person']} / 内容:{row['Content']} / 反省:{r}\n"
                             
-                            # 印刷不可能な文字を除去
                             combined_text = "".join(ch for ch in combined_text if ch.isprintable() or ch == '\n')
+                            prompt = f"以下のイベント反省データを分析し、共通の課題と対策を日本語で要約してください。\n\n{combined_text}"
+
+                            # 🌟 ライブラリを一切使わず、直接通信する方式
+                            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+                            payload = {
+                                "contents": [{"parts": [{"text": prompt}]}]
+                            }
+                            req = urllib.request.Request(
+                                url, 
+                                data=json.dumps(payload).encode('utf-8'), 
+                                headers={'Content-Type': 'application/json'}
+                            )
 
                             try:
-                                import google.generativeai as genai
-                                genai.configure(api_key=API_KEY)
-                                model = genai.GenerativeModel('gemini-pro')
-                                
-                                prompt = f"以下のイベント反省データを分析し、共通の課題と対策を日本語で要約してください。\n\n{combined_text}"
-                                response = model.generate_content(prompt)
-                                
-                                if response.text:
+                                with urllib.request.urlopen(req) as response:
+                                    result = json.loads(response.read().decode('utf-8'))
+                                    answer = result['candidates'][0]['content']['parts'][0]['text']
                                     st.markdown("### 📊 AI分析レポート")
-                                    st.write(response.text)
-                                else:
-                                    st.warning("AIからの応答が空でした。")
+                                    st.write(answer)
+                            except urllib.error.HTTPError as e:
+                                error_msg = e.read().decode('utf-8')
+                                st.error(f"通信エラー ({e.code}): APIキーが間違っているか、通信が弾かれました。詳細: {error_msg}")
                             except Exception as ai_err:
-                                st.error(f"AI分析中にエラーが発生しました: {str(ai_err)}")
+                                st.error(f"システムエラー: {str(ai_err)}")
     except Exception as e:
         st.error(f"画面表示エラー: {str(e)}")
