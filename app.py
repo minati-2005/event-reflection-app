@@ -11,7 +11,7 @@ DATA_FILE = "reflections.csv"
 MASTER_FILE = "master_data.json"
 
 # ▼ ここに取得した Gemini APIキーを貼り付けてください ▼
-GEMINI_API_KEY = "AIza..." 
+API_KEY = st.secrets["GEMINI_API_KEY"] 
 
 # ==========================================
 # データ読み込み・保存関数
