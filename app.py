@@ -56,7 +56,7 @@ if "reset_counter" not in st.session_state:
 # ==========================================
 # アプリ画面の構築
 # ==========================================
-st.set_page_config(page_title="イベント反省アプリ Pro V5", layout="wide")
+st.set_page_config(page_title="イベント反省アプリ Pro V6", layout="wide")
 
 st.title("💡 イベント反省＆分析アプリ Pro")
 tab_input, tab_analysis = st.tabs(["📝 反省を入力", "📊 データを管理・分析"])
@@ -99,7 +99,6 @@ with tab_input:
                 c_col1, c_col2 = st.columns(2)
                 c_good = c_col1.text_area(f"👍 {content} で良かった点", key=f"good_{content}_{reset_key}")
                 c_bad = c_col2.text_area(f"🔧 {content} の改善点", key=f"bad_{content}_{reset_key}")
-                # 🌟 保存形式の工夫：後で読みやすいように
                 if c_good: good_text_list.append(f"●{content}: {c_good}")
                 if c_bad: bad_text_list.append(f"●{content}: {c_bad}")
 
@@ -155,7 +154,6 @@ with tab_analysis:
     if os.path.exists(DATA_FILE):
         df = pd.read_csv(DATA_FILE, encoding='utf-8-sig')
         if not df.empty:
-            # 1. 選択肢の管理
             with st.expander("🛠️ 選択肢の整理（イベント名や名前を消す）"):
                 m_col1, m_col2, m_col3 = st.columns(3)
                 m_del_e = m_col1.multiselect("イベント名の削除", master_data["events"])
@@ -171,7 +169,6 @@ with tab_analysis:
 
             st.markdown("---")
             
-            # 2. 絞り込み
             st.subheader("🔍 データの絞り込み")
             col_f1, col_f2, col_f3 = st.columns(3)
             with col_f1:
@@ -189,13 +186,11 @@ with tab_analysis:
             if c_filter:
                 filtered_df = filtered_df[filtered_df["Content"].apply(lambda x: any(c in str(x) for c in c_filter))]
             
-            # 3. 表示形式の選択
             view_mode = st.radio("表示モード", ["表（一覧）", "詳細カード（すべて読む）"], horizontal=True)
 
             if view_mode == "表（一覧）":
                 st.dataframe(filtered_df.sort_values("Timestamp", ascending=False), use_container_width=True)
             else:
-                # 🌟 詳細閲覧モード：1件ずつカード形式で表示
                 for _, row in filtered_df.sort_values("Timestamp", ascending=False).iterrows():
                     with st.container(border=True):
                         c1, c2, c3 = st.columns([2, 1, 1])
@@ -207,15 +202,17 @@ with tab_analysis:
                         col_g, col_b = st.columns(2)
                         with col_g:
                             st.success("**👍 良かった点**")
-                            # 改行をそのまま表示
-                            st.write(row["GoodPoints"])
+                            # 🌟 修正：Markdownの仕様に合わせて改行を確実に反映させる
+                            good_text = str(row["GoodPoints"]) if pd.notna(row["GoodPoints"]) else ""
+                            st.markdown(good_text.replace("\n", "\n\n"))
                         with col_b:
                             st.warning("**🔧 改善点**")
-                            st.write(row["BadPoints"])
+                            # 🌟 修正：Markdownの仕様に合わせて改行を確実に反映させる
+                            bad_text = str(row["BadPoints"]) if pd.notna(row["BadPoints"]) else ""
+                            st.markdown(bad_text.replace("\n", "\n\n"))
             
             st.markdown("---")
             
-            # 4. 削除機能
             with st.expander("🗑️ 記録を削除する"):
                 del_indices = st.multiselect("削除したい記録のタイムスタンプを選択", options=filtered_df["Timestamp"].tolist())
                 if st.button("選択した記録を完全に削除", type="primary"):
@@ -225,7 +222,6 @@ with tab_analysis:
                         st.success("削除しました。")
                         st.rerun()
 
-            # 5. AI分析
             if not filtered_df.empty:
                 st.subheader("🤖 AI分析")
                 if st.button("🤖 この条件でAI分析を実行", type="primary"):
