@@ -22,16 +22,16 @@ except Exception:
     API_KEY = ""
 
 # ==========================================
-# データ管理
+# データ管理関数
 # ==========================================
 def load_master_data():
     if os.path.exists(MASTER_FILE):
         try:
             with open(MASTER_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                if "events" not in data: data["events"] = []
-                if "contents" not in data: data["contents"] = []
-                if "members" not in data: data["members"] = []
+                # 必要なキーが揃っているか確認
+                for key in ["events", "contents", "members"]:
+                    if key not in data: data[key] = []
                 return data
         except:
             pass
@@ -58,34 +58,16 @@ if "reset_counter" not in st.session_state:
 # ==========================================
 # アプリ画面の構築
 # ==========================================
-st.set_page_config(page_title="イベント反省アプリ Pro", layout="wide")
-
-# サイドバー：項目管理
-with st.sidebar:
-    st.header("⚙️ 選択肢の管理")
-    st.write("不要になった項目を削除できます。")
-    del_event = st.multiselect("🗑️ イベント名の削除", master_data["events"])
-    del_person = st.multiselect("🗑️ 記入者の削除", master_data["members"])
-    del_content = st.multiselect("🗑️ 内容の削除", master_data["contents"])
-    
-    if st.button("選択した項目を削除", type="primary"):
-        master_data["events"] = [e for e in master_data["events"] if e not in del_event]
-        master_data["members"] = [m for m in master_data["members"] if m not in del_person]
-        master_data["contents"] = [c for c in master_data["contents"] if c not in del_content]
-        save_master_data(master_data)
-        st.rerun()
+st.set_page_config(page_title="イベント反省アプリ Pro V4", layout="wide")
 
 st.title("💡 イベント反省＆分析アプリ Pro")
-tab_input, tab_analysis = st.tabs(["📝 反省を入力", "📊 データを分析"])
+tab_input, tab_analysis = st.tabs(["📝 反省を入力", "📊 データを管理・分析"])
 
 # --- タブ1：入力画面 ---
 with tab_input:
-    # リセット用のユニークキーを生成
     reset_key = st.session_state.reset_counter
-    
     st.header("今回の活動を振り返る")
     
-    # 1. 基本情報
     col1, col2, col3 = st.columns([2, 2, 1])
     with col1:
         selected_event = st.selectbox("📌 イベント名", master_data["events"] + ["+ 新規追加"], key=f"evt_{reset_key}")
@@ -96,30 +78,26 @@ with tab_input:
     with col3:
         rating = st.select_slider("⭐ 満足度", options=[1, 2, 3, 4, 5], value=3, key=f"rate_{reset_key}")
 
-    # 2. イベント内容の入力
     st.markdown("---")
     st.subheader("🏷️ 実施した内容")
     col_c1, col_c2 = st.columns([2, 1])
     with col_c1:
         current_contents = st.multiselect("リストから選択", master_data["contents"], key=f"cnt_{reset_key}")
     with col_c2:
-        new_content_raw = st.text_input("🆕 新しい内容を追加（カンマ区切り可）", key=f"new_cnt_{reset_key}", help="例: スライム作り, 備品購入")
+        new_content_raw = st.text_input("🆕 新しい内容を追加（カンマ区切り可）", key=f"new_cnt_{reset_key}")
 
-    # 全ての選択された内容（既存 + 新規）を統合
+    # 内容の統合
     all_selected_contents = current_contents.copy()
     new_content_list = [c.strip() for c in new_content_raw.split(",") if c.strip()]
     all_selected_contents.extend(new_content_list)
-    # 重複除去して整理
     all_selected_contents = sorted(list(set(all_selected_contents)))
 
     st.markdown("---")
     
-    # 3. 項目ごとの詳細入力
+    # 項目ごとの詳細入力
     good_text_list = []
     bad_text_list = []
-
     if all_selected_contents:
-        st.info("選択・追加した各内容について詳細を記入してください。")
         for content in all_selected_contents:
             with st.expander(f"【{content}】の振り返り", expanded=True):
                 c_col1, c_col2 = st.columns(2)
@@ -128,7 +106,6 @@ with tab_input:
                 if c_good: good_text_list.append(f"[{content}] {c_good}")
                 if c_bad: bad_text_list.append(f"[{content}] {c_bad}")
 
-    # 4. 全体の振り返り
     st.subheader("📋 総括")
     col_og, col_ob = st.columns(2)
     overall_good = col_og.text_area("✨ 全体を通して良かった点", key=f"og_{reset_key}")
@@ -137,17 +114,13 @@ with tab_input:
     if overall_good: good_text_list.append(f"[全体] {overall_good}")
     if overall_bad: bad_text_list.append(f"[全体] {overall_bad}")
 
-    # 5. 操作ボタン
-    # 🌟 ここを修正しました (unsafe_allow_url -> unsafe_allow_html)
-    st.markdown("<br>", unsafe_allow_html=True)
     btn_col1, btn_col2 = st.columns([2, 1])
-    
     if btn_col1.button("🚀 この内容を保存する", use_container_width=True, type="primary"):
         final_event = new_event if selected_event == "+ 新規追加" else selected_event
         final_person = new_person if selected_person == "+ 新規追加" else selected_person
         
         if not final_event or not final_person or not all_selected_contents:
-            st.error("入力が不足しています。イベント名、名前、実施内容は必須です。")
+            st.error("入力が不足しています。")
         else:
             new_row = pd.DataFrame({
                 "Timestamp": [datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
@@ -160,6 +133,7 @@ with tab_input:
             })
             new_row.to_csv(DATA_FILE, mode='a', header=False, index=False, encoding='utf-8-sig')
             
+            # マスターデータの自動更新
             updated = False
             if final_event and final_event not in master_data["events"]:
                 master_data["events"].append(final_event); updated = True
@@ -168,12 +142,9 @@ with tab_input:
             for c in all_selected_contents:
                 if c not in master_data["contents"]:
                     master_data["contents"].append(c); updated = True
+            if updated: save_master_data(master_data)
             
-            if updated:
-                save_master_data(master_data)
-            
-            st.success("保存しました！新しい項目も選択肢に追加されました。")
-            st.balloons()
+            st.success("保存しました！")
             st.session_state.reset_counter += 1
             st.rerun()
 
@@ -181,22 +152,41 @@ with tab_input:
         st.session_state.reset_counter += 1
         st.rerun()
 
-# --- タブ2：分析画面 ---
+# --- タブ2：管理・分析画面 ---
 with tab_analysis:
-    st.header("振り返りデータの分析")
+    st.header("データの管理とAI分析")
+    
     if os.path.exists(DATA_FILE):
         df = pd.read_csv(DATA_FILE, encoding='utf-8-sig')
         if not df.empty:
-            st.subheader("🔍 データの絞り込み")
+            # 🌟 追加機能：選択肢の管理（マスターデータ削除）
+            with st.expander("🛠️ 選択肢の整理（イベント名や名前を消す）"):
+                st.write("反省の入力ページに出てくる選択肢を削除できます。")
+                m_col1, m_col2, m_col3 = st.columns(3)
+                m_del_e = m_col1.multiselect("イベント名の削除", master_data["events"])
+                m_del_p = m_col2.multiselect("記入者の削除", master_data["members"])
+                m_del_c = m_col3.multiselect("内容の削除", master_data["contents"])
+                
+                if st.button("選択した項目をマスターから削除", type="secondary"):
+                    master_data["events"] = [e for e in master_data["events"] if e not in m_del_e]
+                    master_data["members"] = [m for m in master_data["members"] if m not in m_del_p]
+                    master_data["contents"] = [c for c in master_data["contents"] if c not in m_del_c]
+                    save_master_data(master_data)
+                    st.success("選択肢を更新しました。")
+                    st.rerun()
+
+            st.markdown("---")
+            
+            st.subheader("🔍 データの絞り込みと削除")
             col_f1, col_f2, col_f3 = st.columns(3)
             with col_f1:
-                e_filter = st.multiselect("イベント名", df["Event"].unique())
+                e_filter = st.multiselect("イベント名で絞り込み", df["Event"].unique())
             with col_f2:
                 all_c_set = set()
                 df["Content"].dropna().str.split(", ").apply(lambda x: all_c_set.update(x))
-                c_filter = st.multiselect("実施内容", sorted(list(all_c_set)))
+                c_filter = st.multiselect("実施内容で絞り込み", sorted(list(all_c_set)))
             with col_f3:
-                p_filter = st.multiselect("記入者", df["Person"].unique())
+                p_filter = st.multiselect("記入者で絞り込み", df["Person"].unique())
             
             filtered_df = df.copy()
             if e_filter: filtered_df = filtered_df[filtered_df["Event"].isin(e_filter)]
@@ -204,32 +194,50 @@ with tab_analysis:
             if c_filter:
                 filtered_df = filtered_df[filtered_df["Content"].apply(lambda x: any(c in str(x) for c in c_filter))]
             
+            # 🌟 追加機能：特定の反省記録（行）を削除
+            st.write("以下のテーブルから削除したいデータを選択してください。")
+            # インデックスを表示して選択可能にする
             st.dataframe(filtered_df.sort_values("Timestamp", ascending=False), use_container_width=True)
             
-            if not filtered_df.empty:
-                st.metric("平均満足度", f"{filtered_df['Rating'].mean():.2f} / 5.0")
-
-            if st.button("🤖 AIで多角的に分析する", type="primary"):
-                if not API_KEY:
-                    st.error("APIキーが設定されていません")
+            del_indices = st.multiselect("🗑️ 記録を完全に削除（タイムスタンプを選択）", 
+                                        options=filtered_df["Timestamp"].tolist(),
+                                        help="間違えて保存した記録を消すことができます")
+            
+            if st.button("選択した記録を削除", type="primary"):
+                if del_indices:
+                    df = df[~df["Timestamp"].isin(del_indices)]
+                    df.to_csv(DATA_FILE, index=False, encoding='utf-8-sig')
+                    st.success("記録を削除しました。")
+                    st.rerun()
                 else:
-                    with st.spinner("⏳ 成功パターンを分析中..."):
-                        combined_text = ""
-                        for _, row in filtered_df.iterrows():
-                            combined_text += f"--- {row['Timestamp']} ---\n満足度:{row['Rating']} / 内容:{row['Content']}\n"
-                            combined_text += f"【良】{row['GoodPoints']}\n【改】{row['BadPoints']}\n\n"
-                        
-                        prompt = f"以下の活動反省データを分析し、満足度向上のための成功要因と、具体的な次の一手を提案してください。\n\n{combined_text}"
-                        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={API_KEY}"
-                        payload = {"contents": [{"parts": [{"text": prompt}]}]}
-                        req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
+                    st.warning("削除するデータを選択してください。")
 
-                        try:
-                            with urllib.request.urlopen(req) as response:
-                                result = json.loads(response.read().decode('utf-8'))
-                                st.markdown("### 📊 AI分析レポート")
-                                st.write(result['candidates'][0]['content']['parts'][0]['text'])
-                        except Exception as e:
-                            st.error(f"分析エラー: {str(e)}")
+            st.markdown("---")
+            
+            if not filtered_df.empty:
+                st.subheader("🤖 AI分析")
+                st.metric("平均満足度", f"{filtered_df['Rating'].mean():.2f} / 5.0")
+                if st.button("🤖 この条件でAI分析を実行", type="primary"):
+                    if not API_KEY:
+                        st.error("APIキーが設定されていません")
+                    else:
+                        with st.spinner("⏳ 成功パターンを分析中..."):
+                            combined_text = ""
+                            for _, row in filtered_df.iterrows():
+                                combined_text += f"--- {row['Timestamp']} ---\n満足度:{row['Rating']} / 内容:{row['Content']}\n"
+                                combined_text += f"【良】{row['GoodPoints']}\n【改】{row['BadPoints']}\n\n"
+                            
+                            prompt = f"以下の活動反省データを分析し、満足度向上のための成功要因と、具体的な次の一手を提案してください。\n\n{combined_text}"
+                            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={API_KEY}"
+                            payload = {"contents": [{"parts": [{"text": prompt}]}]}
+                            req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
+
+                            try:
+                                with urllib.request.urlopen(req) as response:
+                                    result = json.loads(response.read().decode('utf-8'))
+                                    st.markdown("### 📊 AI分析レポート")
+                                    st.write(result['candidates'][0]['content']['parts'][0]['text'])
+                            except Exception as e:
+                                st.error(f"分析エラー: {str(e)}")
     else:
         st.info("データがありません。")
