@@ -159,7 +159,7 @@ with tab_analysis:
                             prompt = f"以下のイベント反省データを分析し、共通の課題と対策を日本語で要約してください。\n\n{combined_text}"
 
                             # 🌟 最新の gemini-2.0-flash を直接呼び出す
-                            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={API_KEY}"
+                            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={API_KEY}"
                             payload = {
                                 "contents": [{"parts": [{"text": prompt}]}]
                             }
