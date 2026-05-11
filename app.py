@@ -5,15 +5,12 @@ import datetime
 import json
 
 # ==========================================
-# 🌟 強制日本語設定（環境レベルでエラーを防ぐ）
+# 🌟 環境設定（日本語エラー対策）
 # ==========================================
 os.environ["LC_ALL"] = "C.UTF-8"
 os.environ["LANG"] = "C.UTF-8"
 os.environ["PYTHONIOENCODING"] = "utf-8"
 
-# ==========================================
-# 🌟 設定
-# ==========================================
 DATA_FILE = "reflections.csv"
 MASTER_FILE = "master_data.json"
 
@@ -24,7 +21,7 @@ except:
     API_KEY = ""
 
 # ==========================================
-# データ読み込み・保存関数
+# データ読み込み・保存
 # ==========================================
 def load_master_data():
     if os.path.exists(MASTER_FILE):
@@ -49,7 +46,7 @@ if not os.path.exists(DATA_FILE):
 
 master_data = load_master_data()
 
-# --- リセット用 ---
+# リセット用
 if "reset_key" not in st.session_state:
     st.session_state.reset_key = 0
 def reset_inputs():
@@ -60,6 +57,7 @@ def reset_inputs():
 # ==========================================
 st.set_page_config(page_title="イベント反省アプリ", layout="wide")
 
+# サイドバー：削除機能
 with st.sidebar:
     st.header("⚙️ 選択肢の削除")
     del_event = st.multiselect("🗑️ 削除するイベント", master_data["events"])
@@ -77,7 +75,7 @@ with st.sidebar:
 st.title("💡 イベント反省＆分析アプリ")
 tab_input, tab_analysis = st.tabs(["📝 反省を入力", "📊 データを分析"])
 
-# タブ1：入力
+# --- タブ1：入力画面 ---
 with tab_input:
     st.header("新しい反省を記録")
     k = st.session_state.reset_key
@@ -114,11 +112,9 @@ with tab_input:
             # マスターデータ更新
             updated = False
             if final_event and final_event not in master_data["events"]:
-                master_data["events"].append(final_event)
-                updated = True
+                master_data["events"].append(final_event); updated = True
             if final_person and final_person not in master_data["members"]:
-                master_data["members"].append(final_person)
-                updated = True
+                master_data["members"].append(final_person); updated = True
             for c in final_contents:
                 if c not in master_data["contents"]:
                     master_data["contents"].append(c); updated = True
@@ -127,61 +123,56 @@ with tab_input:
             st.balloons()
     c2.button("🔄 入力をリセット", on_click=reset_inputs, use_container_width=True)
 
-# タブ2：分析
+# --- タブ2：分析画面 ---
 with tab_analysis:
     st.header("これまでの反省を振り返る")
     try:
-        df = pd.read_csv(DATA_FILE, encoding='utf-8-sig')
-        if df.empty:
-            st.info("データがありません。")
+        if not os.path.exists(DATA_FILE):
+            st.info("データファイルがまだありません。")
         else:
-            st.subheader("🔍 絞り込み")
-            f1, f2 = st.columns(2)
-            event_filter = f1.multiselect("イベント", df["Event"].unique())
-            person_filter = f2.multiselect("記入者", df["Person"].unique())
-            
-            filtered_df = df.copy()
-            if event_filter: filtered_df = filtered_df[filtered_df["Event"].isin(event_filter)]
-            if person_filter: filtered_df = filtered_df[filtered_df["Person"].isin(person_filter)]
-            
-            st.dataframe(filtered_df.sort_values("Timestamp", ascending=False), use_container_width=True)
-            
-if st.button("🤖 AIで分析する", type="primary"):
-                if not API_KEY:
-                    st.error("APIキーが設定されていません")
-                else:
-                    with st.spinner("⏳ AIが分析中..."):
-                        # 🌟 送信データを徹底的にお掃除する
-                        combined_text = ""
-                        for _, row in filtered_df.iterrows():
-                            # 各項目から改行や変な文字を除去して1行にまとめる
-                            e = str(row['Event']).replace('\n', ' ')
-                            p = str(row['Person']).replace('\n', ' ')
-                            c = str(row['Content']).replace('\n', ' ')
-                            r = str(row['Reflection']).replace('\n', ' ')
-                            combined_text += f"イベント:{e} / 人:{p} / 内容:{c} / 反省:{r}\n"
-                        
-                        # 文字列をきれいに掃除（念のため）
-                        combined_text = "".join(ch for ch in combined_text if ch.isprintable() or ch == '\n')
+            df = pd.read_csv(DATA_FILE, encoding='utf-8-sig')
+            if df.empty:
+                st.info("データがまだありません。")
+            else:
+                st.subheader("🔍 絞り込み")
+                f1, f2 = st.columns(2)
+                event_filter = f1.multiselect("イベントで絞り込み", df["Event"].unique())
+                person_filter = f2.multiselect("記入者で絞り込み", df["Person"].unique())
+                
+                filtered_df = df.copy()
+                if event_filter: filtered_df = filtered_df[filtered_df["Event"].isin(event_filter)]
+                if person_filter: filtered_df = filtered_df[filtered_df["Person"].isin(person_filter)]
+                
+                st.dataframe(filtered_df.sort_values("Timestamp", ascending=False), use_container_width=True)
+                
+                if st.button("🤖 AIで分析する", type="primary"):
+                    if not API_KEY:
+                        st.error("APIキーが設定されていません")
+                    else:
+                        with st.spinner("⏳ AIが分析中..."):
+                            # 送信データのクリーニング
+                            combined_text = ""
+                            for _, row in filtered_df.iterrows():
+                                r = str(row['Reflection']).replace('\n', ' ')
+                                combined_text += f"【{row['Event']}】担当:{row['Person']} / 内容:{row['Content']} / 反省:{r}\n"
+                            
+                            # 印刷不可能な文字を除去
+                            combined_text = "".join(ch for ch in combined_text if ch.isprintable() or ch == '\n')
 
-                        try:
-                            import google.generativeai as genai
-                            genai.configure(api_key=API_KEY)
-                            
-                            # 🌟 モデルを一番軽量な「flash-8b」に変えてみる（さらに高速化）
-                            model = genai.GenerativeModel('gemini-1.5-flash-8b')
-                            
-                            prompt = f"以下のイベント反省データを分析し、共通の課題と対策を日本語で短くまとめてください。\n\n{combined_text}"
-                            
-                            # タイムアウト対策：一気に取得する
-                            response = model.generate_content(prompt)
-                            
-                            if response.text:
-                                st.markdown("### 📊 AI分析レポート")
-                                st.write(response.text)
-                            else:
-                                st.warning("AIから有効な返答が得られませんでした。")
-
-                        except Exception as e:
-                            # エラー内容をより詳しく出すように変更
-                            st.error(f"分析エラーが発生しました。詳細: {str(e)}")
+                            try:
+                                import google.generativeai as genai
+                                genai.configure(api_key=API_KEY)
+                                model = genai.GenerativeModel('gemini-1.5-flash-8b') # 最速モデル
+                                
+                                prompt = f"以下のイベント反省データを分析し、共通の課題と対策を日本語で要約してください。\n\n{combined_text}"
+                                response = model.generate_content(prompt)
+                                
+                                if response.text:
+                                    st.markdown("### 📊 AI分析レポート")
+                                    st.write(response.text)
+                                else:
+                                    st.warning("AIからの応答が空でした。")
+                            except Exception as ai_err:
+                                st.error(f"AI分析中にエラーが発生しました: {str(ai_err)}")
+    except Exception as e:
+        st.error(f"画面表示エラー: {str(e)}")
