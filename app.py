@@ -162,7 +162,7 @@ with tab_analysis:
                             try:
                                 import google.generativeai as genai
                                 genai.configure(api_key=API_KEY)
-                                model = genai.GenerativeModel('gemini-1.5-flash')
+                                model = genai.GenerativeModel('gemini-pro')
                                 
                                 prompt = f"以下のイベント反省データを分析し、共通の課題と対策を日本語で要約してください。\n\n{combined_text}"
                                 response = model.generate_content(prompt)
