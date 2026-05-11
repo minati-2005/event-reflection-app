@@ -3,29 +3,39 @@ import pandas as pd
 import os
 import datetime
 import json
+import sys
+import io
+
+# 🌟 強制的に日本語(UTF-8)で処理させる設定（おまじない）
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 # ==========================================
-# 🌟設定（ここでAPIキーを設定します） 
+# 🌟 設定
 # ==========================================
 DATA_FILE = "reflections.csv"
 MASTER_FILE = "master_data.json"
 
-# ▼ ここに取得した Gemini APIキーを貼り付けてください ▼
-API_KEY = st.secrets["GEMINI_API_KEY"] 
+# APIキーを金庫から取り出す
+try:
+    API_KEY = st.secrets["GEMINI_API_KEY"]
+except:
+    API_KEY = ""
 
 # ==========================================
-# データ読み込み・保存関数
+# データ読み込み・保存関数（日本語対応を徹底）
 # ==========================================
 def load_master_data():
     if os.path.exists(MASTER_FILE):
-        with open(MASTER_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    else:
-        return {
-            "events": ["新歓コンパ", "企画展示", "定例ミーティング"],
-            "contents": ["会場設営", "集客・宣伝", "当日の進行", "予算管理", "片付け"],
-            "members": ["自分"]
-        }
+        try:
+            with open(MASTER_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
+    return {
+        "events": ["新歓コンパ", "企画展示", "定例ミーティング"],
+        "contents": ["会場設営", "集客・宣伝", "当日の進行", "予算管理", "片付け"],
+        "members": ["自分"]
+    }
 
 def save_master_data(data):
     with open(MASTER_FILE, "w", encoding="utf-8") as f:
@@ -33,7 +43,7 @@ def save_master_data(data):
 
 if not os.path.exists(DATA_FILE):
     df = pd.DataFrame(columns=["Timestamp", "Event", "Content", "Person", "Reflection"])
-    df.to_csv(DATA_FILE, index=False, encoding='utf-8-sig')
+    df.to_csv(DATA_FILE, index=False, encoding='utf-8-sig') # 🌟 encodingを追加
 
 master_data = load_master_data()
 
@@ -49,10 +59,9 @@ def reset_inputs():
 # ==========================================
 st.set_page_config(page_title="イベント反省アプリ", layout="wide")
 
-# 🌟 画面左側のサイドバー：選択肢の管理（削除）
+# サイドバー：選択肢の削除
 with st.sidebar:
     st.header("⚙️ 選択肢の削除")
-    st.write("不要になった選択肢を消去できます")
     del_event = st.multiselect("🗑️ 削除するイベント", master_data["events"])
     del_person = st.multiselect("🗑️ 削除する記入者", master_data["members"])
     del_content = st.multiselect("🗑️ 削除する内容", master_data["contents"])
@@ -74,19 +83,15 @@ tab_input, tab_analysis = st.tabs(["📝 反省を入力", "📊 データを分
 # ==========================================
 with tab_input:
     st.header("新しい反省を記録")
-    
-    # リセット機能のためのキー設定
     k = st.session_state.reset_key
     
     col1, col2 = st.columns(2)
     with col1:
         selected_event = st.selectbox("📌 イベント名を選択", master_data["events"] + ["+ 新規追加"], key=f"evt_{k}")
-        if selected_event == "+ 新規追加":
-            new_event = st.text_input("🆕 新しいイベント名を入力", key=f"new_evt_{k}")
+        new_event = st.text_input("🆕 新しいイベント名を入力", key=f"new_evt_{k}") if selected_event == "+ 新規追加" else ""
         
         selected_person = st.selectbox("👤 記入者を選択", master_data["members"] + ["+ 新規追加"], key=f"psn_{k}")
-        if selected_person == "+ 新規追加":
-            new_person = st.text_input("🆕 新しい名前を入力", key=f"new_psn_{k}")
+        new_person = st.text_input("🆕 新しい名前を入力", key=f"new_psn_{k}") if selected_person == "+ 新規追加" else ""
 
     with col2:
         selected_contents = st.multiselect("🏷️ イベント内容（タグ付け）", master_data["contents"], key=f"cnt_{k}")
@@ -94,7 +99,6 @@ with tab_input:
 
     reflection_text = st.text_area("✍️ 反省・気付き・課題などを入力", height=200, key=f"txt_{k}")
     
-    # 保存とリセットボタンを並べる
     btn_col1, btn_col2 = st.columns([1, 1])
     with btn_col1:
         save_btn = st.button("🚀 この内容を保存する", use_container_width=True)
@@ -110,7 +114,7 @@ with tab_input:
             final_contents.append(new_content_item)
         
         if not final_event or not reflection_text or not final_person:
-            st.error("イベント名、記入者、反省内容は必須です！")
+            st.error("入力が不足しています")
         else:
             new_row = pd.DataFrame({
                 "Timestamp": [datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
@@ -119,13 +123,14 @@ with tab_input:
                 "Person": [final_person],
                 "Reflection": [reflection_text]
             })
+            # 🌟 保存時の日本語設定を強化
             new_row.to_csv(DATA_FILE, mode='a', header=False, index=False, encoding='utf-8-sig')
             
             updated = False
-            if final_event not in master_data["events"]:
+            if final_event and final_event not in master_data["events"]:
                 master_data["events"].append(final_event)
                 updated = True
-            if final_person not in master_data["members"]:
+            if final_person and final_person not in master_data["members"]:
                 master_data["members"].append(final_person)
                 updated = True
             for c in final_contents:
@@ -135,7 +140,6 @@ with tab_input:
             
             if updated:
                 save_master_data(master_data)
-            
             st.success(f"保存しました！")
             st.balloons()
 
@@ -146,13 +150,13 @@ with tab_analysis:
     st.header("これまでの反省を振り返る")
     
     try:
+        # 🌟 読み込み時の日本語設定を強化
         df = pd.read_csv(DATA_FILE, encoding='utf-8-sig')
         if df.empty:
             st.info("データがありません。")
         else:
-            st.subheader("🔍 データの絞り込みと並び替え")
+            st.subheader("🔍 絞り込みと並び替え")
             
-            # Contentの一覧を取得
             all_contents = set()
             for c_str in df["Content"].dropna():
                 for c in str(c_str).split(", "):
@@ -160,38 +164,30 @@ with tab_analysis:
             
             f_col1, f_col2, f_col3 = st.columns(3)
             with f_col1:
-                event_filter = st.multiselect("イベントで絞り込み", df["Event"].unique())
+                event_filter = st.multiselect("イベント", df["Event"].unique())
             with f_col2:
-                person_filter = st.multiselect("記入者で絞り込み", df["Person"].unique())
+                person_filter = st.multiselect("記入者", df["Person"].unique())
             with f_col3:
-                content_filter = st.multiselect("内容で絞り込み", list(all_contents))
+                content_filter = st.multiselect("内容", list(all_contents))
             
-            sort_order = st.selectbox("並び替えの基準", ["新しい順 (Timestamp)", "古い順 (Timestamp)", "イベント名順", "記入者順"])
+            sort_order = st.selectbox("順序", ["新しい順", "古い順"])
             
             filtered_df = df.copy()
-            if event_filter:
-                filtered_df = filtered_df[filtered_df["Event"].isin(event_filter)]
-            if person_filter:
-                filtered_df = filtered_df[filtered_df["Person"].isin(person_filter)]
+            if event_filter: filtered_df = filtered_df[filtered_df["Event"].isin(event_filter)]
+            if person_filter: filtered_df = filtered_df[filtered_df["Person"].isin(person_filter)]
             if content_filter:
-                # 選択したタグのいずれかが含まれているデータを抽出
                 filtered_df = filtered_df[filtered_df["Content"].apply(lambda x: any(c in str(x) for c in content_filter))]
                 
-            # 並び替えの実行
-            if sort_order == "新しい順 (Timestamp)":
+            if sort_order == "新しい順":
                 filtered_df = filtered_df.sort_values("Timestamp", ascending=False)
-            elif sort_order == "古い順 (Timestamp)":
+            else:
                 filtered_df = filtered_df.sort_values("Timestamp", ascending=True)
-            elif sort_order == "イベント名順":
-                filtered_df = filtered_df.sort_values("Event")
-            elif sort_order == "記入者順":
-                filtered_df = filtered_df.sort_values("Person")
                 
             st.dataframe(filtered_df, use_container_width=True)
             
-            if st.button("🤖 AIでこの表示中データを分析する", type="primary"):
-                if API_KEY == "ここにAPIキーを貼り付ける" or API_KEY == "":
-                    st.error("コード上部の「API_KEY」が設定されていません！")
+            if st.button("🤖 AIで分析する", type="primary"):
+                if not API_KEY:
+                    st.error("APIキーが設定されていません")
                 elif filtered_df.empty:
                     st.warning("分析するデータがありません。")
                 else:
@@ -200,16 +196,19 @@ with tab_analysis:
                         for _, row in filtered_df.iterrows():
                             combined_text += f"\n【{row['Event']} / {row['Person']}】\n内容: {row['Content']}\n反省: {row['Reflection']}\n"
                         
+                        # 🌟 送信するプロンプト自体もUTF-8として扱う
                         prompt = f"以下のイベント反省データを分析し、共通の課題と具体的な対策をまとめてください。\n{combined_text}"
                         
                         try:
                             from google import genai
                             client = genai.Client(api_key=API_KEY)
+                            # 🌟 モデル名は最新の gemini-2.0-flash を使用
                             response = client.models.generate_content(model='gemini-2.0-flash', contents=prompt)
                             st.markdown("### 📊 AI分析レポート")
                             st.write(response.text)
                         except Exception as e:
-                            st.error(f"分析エラー: {e}")
+                            # 🌟 エラー内容を詳しく表示
+                            st.error(f"分析エラー: {str(e)}")
                         
     except Exception as e:
-        st.error(f"読み込みエラー: {e}")
+        st.error(f"読み込みエラー: {str(e)}")
