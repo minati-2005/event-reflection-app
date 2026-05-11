@@ -16,10 +16,11 @@ os.environ["PYTHONIOENCODING"] = "utf-8"
 DATA_FILE = "reflections.csv"
 MASTER_FILE = "master_data.json"
 
-# 🌟 APIキーの「見えない空白・改行」を自動で消す
+# 🌟 APIキーを「金庫（Secrets）」から安全に読み込む
+# 前後の余計な空白を自動で削除する .strip() を付けています
 try:
     API_KEY = st.secrets["GEMINI_API_KEY"].strip()
-except:
+except Exception:
     API_KEY = ""
 
 # ==========================================
@@ -146,7 +147,7 @@ with tab_analysis:
                 
                 if st.button("🤖 AIで分析する", type="primary"):
                     if not API_KEY:
-                        st.error("APIキーが設定されていません")
+                        st.error("APIキーが設定されていません。StreamlitのSecrets設定を確認してください。")
                     else:
                         with st.spinner("⏳ AIが直接分析中..."):
                             combined_text = ""
@@ -157,7 +158,7 @@ with tab_analysis:
                             combined_text = "".join(ch for ch in combined_text if ch.isprintable() or ch == '\n')
                             prompt = f"以下のイベント反省データを分析し、共通の課題と対策を日本語で要約してください。\n\n{combined_text}"
 
-                            # 🌟 ライブラリを一切使わず、直接通信する方式
+                            # 🌟 最新の gemini-2.0-flash を直接呼び出す
                             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={API_KEY}"
                             payload = {
                                 "contents": [{"parts": [{"text": prompt}]}]
@@ -176,7 +177,7 @@ with tab_analysis:
                                     st.write(answer)
                             except urllib.error.HTTPError as e:
                                 error_msg = e.read().decode('utf-8')
-                                st.error(f"通信エラー ({e.code}): APIキーが間違っているか、通信が弾かれました。詳細: {error_msg}")
+                                st.error(f"通信エラー ({e.code}): 詳細: {error_msg}")
                             except Exception as ai_err:
                                 st.error(f"システムエラー: {str(ai_err)}")
     except Exception as e:
