@@ -3,11 +3,6 @@ import pandas as pd
 import os
 import datetime
 import json
-import sys
-import io
-
-# 🌟 強制的に日本語(UTF-8)で処理させる設定（おまじない）
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 # ==========================================
 # 🌟 設定
@@ -43,7 +38,7 @@ def save_master_data(data):
 
 if not os.path.exists(DATA_FILE):
     df = pd.DataFrame(columns=["Timestamp", "Event", "Content", "Person", "Reflection"])
-    df.to_csv(DATA_FILE, index=False, encoding='utf-8-sig') # 🌟 encodingを追加
+    df.to_csv(DATA_FILE, index=False, encoding='utf-8-sig')
 
 master_data = load_master_data()
 
@@ -123,7 +118,6 @@ with tab_input:
                 "Person": [final_person],
                 "Reflection": [reflection_text]
             })
-            # 🌟 保存時の日本語設定を強化
             new_row.to_csv(DATA_FILE, mode='a', header=False, index=False, encoding='utf-8-sig')
             
             updated = False
@@ -150,7 +144,6 @@ with tab_analysis:
     st.header("これまでの反省を振り返る")
     
     try:
-        # 🌟 読み込み時の日本語設定を強化
         df = pd.read_csv(DATA_FILE, encoding='utf-8-sig')
         if df.empty:
             st.info("データがありません。")
@@ -196,18 +189,15 @@ with tab_analysis:
                         for _, row in filtered_df.iterrows():
                             combined_text += f"\n【{row['Event']} / {row['Person']}】\n内容: {row['Content']}\n反省: {row['Reflection']}\n"
                         
-                        # 🌟 送信するプロンプト自体もUTF-8として扱う
                         prompt = f"以下のイベント反省データを分析し、共通の課題と具体的な対策をまとめてください。\n{combined_text}"
                         
                         try:
                             from google import genai
                             client = genai.Client(api_key=API_KEY)
-                            # 🌟 モデル名は最新の gemini-2.0-flash を使用
                             response = client.models.generate_content(model='gemini-2.0-flash', contents=prompt)
                             st.markdown("### 📊 AI分析レポート")
                             st.write(response.text)
                         except Exception as e:
-                            # 🌟 エラー内容を詳しく表示
                             st.error(f"分析エラー: {str(e)}")
                         
     except Exception as e:
