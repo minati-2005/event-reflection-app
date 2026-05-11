@@ -58,7 +58,7 @@ if "reset_counter" not in st.session_state:
 # ==========================================
 # アプリ画面の構築
 # ==========================================
-st.set_page_config(page_title="イベント反省アプリ Pro V3", layout="wide")
+st.set_page_config(page_title="イベント反省アプリ Pro", layout="wide")
 
 # サイドバー：項目管理
 with st.sidebar:
@@ -96,7 +96,7 @@ with tab_input:
     with col3:
         rating = st.select_slider("⭐ 満足度", options=[1, 2, 3, 4, 5], value=3, key=f"rate_{reset_key}")
 
-    # 2. イベント内容の入力（改善：既存選択と新規入力を並列化）
+    # 2. イベント内容の入力
     st.markdown("---")
     st.subheader("🏷️ 実施した内容")
     col_c1, col_c2 = st.columns([2, 1])
@@ -105,7 +105,7 @@ with tab_input:
     with col_c2:
         new_content_raw = st.text_input("🆕 新しい内容を追加（カンマ区切り可）", key=f"new_cnt_{reset_key}", help="例: スライム作り, 備品購入")
 
-    # 全ての選択された内容（既存 + 新規）を統合して詳細入力欄を作成
+    # 全ての選択された内容（既存 + 新規）を統合
     all_selected_contents = current_contents.copy()
     new_content_list = [c.strip() for c in new_content_raw.split(",") if c.strip()]
     all_selected_contents.extend(new_content_list)
@@ -138,7 +138,8 @@ with tab_input:
     if overall_bad: bad_text_list.append(f"[全体] {overall_bad}")
 
     # 5. 操作ボタン
-    st.markdown("<br>", unsafe_allow_url=True)
+    # 🌟 ここを修正しました (unsafe_allow_url -> unsafe_allow_html)
+    st.markdown("<br>", unsafe_allow_html=True)
     btn_col1, btn_col2 = st.columns([2, 1])
     
     if btn_col1.button("🚀 この内容を保存する", use_container_width=True, type="primary"):
@@ -148,7 +149,6 @@ with tab_input:
         if not final_event or not final_person or not all_selected_contents:
             st.error("入力が不足しています。イベント名、名前、実施内容は必須です。")
         else:
-            # CSVデータの保存
             new_row = pd.DataFrame({
                 "Timestamp": [datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
                 "Event": [final_event],
@@ -160,7 +160,6 @@ with tab_input:
             })
             new_row.to_csv(DATA_FILE, mode='a', header=False, index=False, encoding='utf-8-sig')
             
-            # マスターデータの更新（保存と同時に選択肢を更新）
             updated = False
             if final_event and final_event not in master_data["events"]:
                 master_data["events"].append(final_event); updated = True
@@ -175,11 +174,9 @@ with tab_input:
             
             st.success("保存しました！新しい項目も選択肢に追加されました。")
             st.balloons()
-            # 画面を更新して新しい選択肢を反映し、入力をリセット
             st.session_state.reset_counter += 1
             st.rerun()
 
-    # 🔄 リセットボタンの復活
     if btn_col2.button("🔄 入力をリセット", use_container_width=True):
         st.session_state.reset_counter += 1
         st.rerun()
@@ -195,7 +192,6 @@ with tab_analysis:
             with col_f1:
                 e_filter = st.multiselect("イベント名", df["Event"].unique())
             with col_f2:
-                # Content列をバラして絞り込みの選択肢を作成
                 all_c_set = set()
                 df["Content"].dropna().str.split(", ").apply(lambda x: all_c_set.update(x))
                 c_filter = st.multiselect("実施内容", sorted(list(all_c_set)))
