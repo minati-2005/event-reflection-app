@@ -33,7 +33,7 @@ def save_master_data(data):
 
 if not os.path.exists(DATA_FILE):
     df = pd.DataFrame(columns=["Timestamp", "Event", "Content", "Person", "Reflection"])
-    df.to_csv(DATA_FILE, index=False)
+    df.to_csv(DATA_FILE, index=False, encoding='utf-8-sig')
 
 master_data = load_master_data()
 
@@ -119,7 +119,7 @@ with tab_input:
                 "Person": [final_person],
                 "Reflection": [reflection_text]
             })
-            new_row.to_csv(DATA_FILE, mode='a', header=False, index=False)
+            new_row.to_csv(DATA_FILE, mode='a', header=False, index=False, encoding='utf-8-sig')
             
             updated = False
             if final_event not in master_data["events"]:
@@ -146,7 +146,7 @@ with tab_analysis:
     st.header("これまでの反省を振り返る")
     
     try:
-        df = pd.read_csv(DATA_FILE)
+        df = pd.read_csv(DATA_FILE, encoding='utf-8-sig')
         if df.empty:
             st.info("データがありません。")
         else:
