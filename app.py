@@ -5,13 +5,13 @@ import datetime
 import json
 
 # ==========================================
-# 🌟API_KEY = st.secrets["GEMINI_API_KEY"] 
+# 🌟設定（ここでAPIキーを設定します） 
 # ==========================================
 DATA_FILE = "reflections.csv"
 MASTER_FILE = "master_data.json"
 
 # ▼ ここに取得した Gemini APIキーを貼り付けてください ▼
-API_KEY = "ここにAPIキーを貼り付ける" 
+GEMINI_API_KEY = "AIza..." 
 
 # ==========================================
 # データ読み込み・保存関数
